@@ -1,90 +1,105 @@
-let projects = [];
+const Project = require("../models/projectModel");
 
-const getProjects = (req, res) => {
-    res.json(projects);
+// GET all projects
+const getProjects = async (req, res) => {
+  try {
+    const projects = await Project.find().populate("userId");
+    res.status(200).json(projects);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
-const getProjectById = (req, res) => {
-    const id = parseInt(req.params.id);
-
-    const project = projects.find((p) => p.id === id);
+// GET project by ID
+const getProjectById = async (req, res) => {
+  try {
+    const project = await Project.findById(req.params.id).populate("userId");
 
     if (!project) {
-        return res.status(404).json({
-            error: "Project not found"
-        });
+      return res.status(404).json({
+        error: "Project not found"
+      });
     }
 
-    res.json(project);
+    res.status(200).json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
 
-const createProject = (req, res) => {
+// CREATE project
+const createProject = async (req, res) => {
+  try {
     const { name, description, userId } = req.body;
 
-    if (!name || !description || !userId) {
-        return res.status(400).json({
-            error: "Name, description and userId are required"
-        });
+    if (!name || !userId) {
+      return res.status(400).json({
+        error: "Name and userId are required"
+      });
     }
 
-    const project = {
-        id: projects.length + 1,
+    const project = await Project.create({
+      name,
+      description,
+      userId
+    });
+
+    res.status(201).json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// UPDATE project
+const updateProject = async (req, res) => {
+  try {
+    const { name, description, userId } = req.body;
+
+    const project = await Project.findByIdAndUpdate(
+      req.params.id,
+      {
         name,
         description,
         userId
-    };
-
-    projects.push(project);
-
-    res.status(201).json(project);
-};
-const updateProject = (req, res) => {
-    const id = parseInt(req.params.id);
-
-    const project = projects.find((p) => p.id === id);
+      },
+      { new: true, runValidators: true }
+    );
 
     if (!project) {
-        return res.status(404).json({
-            error: "Project not found"
-        });
+      return res.status(404).json({
+        error: "Project not found"
+      });
     }
 
-    const { name, description, userId } = req.body;
-
-    if (!name || !description || !userId) {
-        return res.status(400).json({
-            error: "Name, description and userId are required"
-        });
-    }
-
-    project.name = name;
-    project.description = description;
-    project.userId = userId;
-
-    res.json(project);
+    res.status(200).json(project);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
-const deleteProject = (req, res) => {
-    const id = parseInt(req.params.id);
 
-    const index = projects.findIndex((p) => p.id === id);
+// DELETE project
+const deleteProject = async (req, res) => {
+  try {
+    const project = await Project.findByIdAndDelete(req.params.id);
 
-    if (index === -1) {
-        return res.status(404).json({
-            error: "Project not found"
-        });
+    if (!project) {
+      return res.status(404).json({
+        error: "Project not found"
+      });
     }
 
-    const deletedProject = projects.splice(index, 1);
-
-    res.json({
-        message: "Project deleted successfully",
-        project: deletedProject[0]
+    res.status(200).json({
+      message: "Project deleted successfully"
     });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 };
+
 module.exports = {
-    getProjects,
-    getProjectById,
-    createProject,
-    updateProject,
-    deleteProject
+  getProjects,
+  getProjectById,
+  createProject,
+  updateProject,
+  deleteProject
 };
