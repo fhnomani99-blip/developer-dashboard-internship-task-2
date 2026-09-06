@@ -1,11 +1,11 @@
 const express = require("express");
 
 const {
-    getProjects,
-    getProjectById,
-    createProject,
-    updateProject,
-    deleteProject
+  getProjects,
+  getProjectById,
+  createProject,
+  updateProject,
+  deleteProject
 } = require("../controllers/projectController");
 
 const router = express.Router();
