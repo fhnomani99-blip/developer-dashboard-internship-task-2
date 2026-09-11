@@ -1,10 +1,107 @@
-const mongoose = require("mongoose");
 const User = require("../models/userModel");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 
-// GET all users
+// Register user
+const registerUser = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        error: "Name, email and password are required",
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+      return res.status(400).json({
+        error: "User already exists",
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    res.status(201).json({
+      message: "User registered successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+// Login user
+const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        error: "Email and password are required",
+      });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(401).json({
+        error: "Invalid email or password",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        error: "Invalid email or password",
+      });
+    }
+
+    const token = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "7d",
+      }
+    );
+
+    res.status(200).json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};
+
+// Get all users
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find();
+    const users = await User.find().select("-password");
     res.status(200).json(users);
   } catch (error) {
     res.status(500).json({
@@ -13,23 +110,27 @@ const getUsers = async (req, res) => {
   }
 };
 
-// CREATE user
+// Create user
 const createUser = async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, password } = req.body;
 
-    if (!name || !email) {
-      return res.status(400).json({
-        error: "Name and email are required",
-      });
-    }
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       name,
       email,
+      password: hashedPassword,
     });
 
-    res.status(201).json(user);
+    res.status(201).json({
+      message: "User created successfully",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    });
   } catch (error) {
     res.status(500).json({
       error: error.message,
@@ -37,18 +138,10 @@ const createUser = async (req, res) => {
   }
 };
 
-// GET user by ID
+// Get user by ID
 const getUserById = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        error: "Invalid user ID",
-      });
-    }
-
-    const user = await User.findById(id);
+    const user = await User.findById(req.params.id).select("-password");
 
     if (!user) {
       return res.status(404).json({
@@ -64,26 +157,13 @@ const getUserById = async (req, res) => {
   }
 };
 
-// UPDATE user
+// Update user
 const updateUser = async (req, res) => {
   try {
-    const { id } = req.params;
     const { name, email } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        error: "Invalid user ID",
-      });
-    }
-
-    if (!name || !email) {
-      return res.status(400).json({
-        error: "Name and email are required",
-      });
-    }
-
     const user = await User.findByIdAndUpdate(
-      id,
+      req.params.id,
       {
         name,
         email,
@@ -92,7 +172,7 @@ const updateUser = async (req, res) => {
         new: true,
         runValidators: true,
       }
-    );
+    ).select("-password");
 
     if (!user) {
       return res.status(404).json({
@@ -100,7 +180,10 @@ const updateUser = async (req, res) => {
       });
     }
 
-    res.status(200).json(user);
+    res.status(200).json({
+      message: "User updated successfully",
+      user,
+    });
   } catch (error) {
     res.status(500).json({
       error: error.message,
@@ -108,18 +191,10 @@ const updateUser = async (req, res) => {
   }
 };
 
-// DELETE user
+// Delete user
 const deleteUser = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({
-        error: "Invalid user ID",
-      });
-    }
-
-    const user = await User.findByIdAndDelete(id);
+    const user = await User.findByIdAndDelete(req.params.id);
 
     if (!user) {
       return res.status(404).json({
@@ -138,6 +213,8 @@ const deleteUser = async (req, res) => {
 };
 
 module.exports = {
+  registerUser,
+  loginUser,
   getUsers,
   createUser,
   getUserById,
